@@ -1,0 +1,30 @@
+name: PLA Intel Scraper
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # 每小時整點執行
+  workflow_dispatch:        # 也可以手動觸發
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝依賴套件
+        run: |
+          pip install requests beautifulsoup4 gspread google-auth
+
+      - name: 執行爬蟲
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scraper.py
