@@ -41,40 +41,48 @@ YOUTUBE_CHANNELS = [
 
 # ── 新聞來源 ─────────────────────────────────────────────────
 SOURCES = [
+    # ── 陸軍專屬來源（最重要）──────────────────────────────
+    {
+        "id": "pla_army",
+        "name": "中國陸軍",
+        "url": "http://www.81.cn/zglj/index.html",
+        "article_selector": "a",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
+    },
     {
         "id": "pla_daily",
         "name": "解放軍報",
         "url": "http://www.81.cn/jfjb/index.html",
         "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
     {
         "id": "mod_gov",
         "name": "國防部",
         "url": "http://www.mod.gov.cn/gfbw/qwfb/index.html",
         "article_selector": ".arti-title a, .news-list a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
     {
         "id": "chinamil",
         "name": "中國軍網",
         "url": "http://www.chinamil.com.cn/",
         "article_selector": ".news-list a, h3 a, h4 a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
     {
         "id": "xinhua_mil",
         "name": "新華軍事",
         "url": "http://military.news.cn/",
         "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
     {
         "id": "guofang_bao",
         "name": "國防報",
         "url": "http://www.81.cn/gfb/index.html",
         "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
+        "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
     # ── CCTV-7 國防軍事頻道全部節目 ──────────────────────────
     {
@@ -230,12 +238,24 @@ SOURCES = [
 
 # ── 分類關鍵字 ───────────────────────────────────────────────
 KEYWORDS = {
-    "陸軍":         ["陸軍","步兵","裝甲","炮兵","山地","特種作戰","兩棲","機械化","合成旅"],
-    "海軍":         ["海軍","艦艇","驅逐艦","護衛艦","航母","潛艇","水面艦","海上","渡海","反潛"],
-    "空軍":         ["空軍","戰機","殲-","轟-","運-","直升機","飛行員","航空","制空"],
-    "火箭軍":       ["火箭軍","導彈","彈道","洲際","巡航導彈","精確打擊"],
-    "戰略支援部隊": ["戰略支援","衛星","太空","網絡","電磁","電子對抗","偵察"],
-    "聯合作戰":     ["聯合","戰區","多軍種","協同","聯演"],
+    "陸軍":         ["陸軍","步兵","裝甲","炮兵","山地","特種作戰","兩棲","機械化","合成旅",
+                    "集團軍","某旅","某團","某師","某營","陸戰","地面部隊","輕步兵",
+                    "75集團軍","74集團軍","73集團軍","72集團軍","71集團軍",
+                    "82集團軍","83集團軍","78集團軍","79集團軍","80集團軍","81集團軍",
+                    "戰車","裝甲兵","炮兵","工兵","防空旅"],
+    "海軍":         ["海軍","艦艇","驅逐艦","護衛艦","航母","潛艇","水面艦","渡海","反潛",
+                    "艦隊","登陸艦","兩棲攻擊","海上補給","艦載機","水兵"],
+    "空軍":         ["空軍","戰機","殲-","轟-","飛行員","制空","空中作戰","空降",
+                    "航空兵","轟炸機","運輸機","預警機","加油機"],
+    "火箭軍":       ["火箭軍","彈道導彈","洲際","巡航導彈","精確打擊","核反擊","東風"],
+    "戰略支援部隊": ["戰略支援","電子對抗","網絡攻防","信息作戰","偵察衛星"],
+    "航天":         ["飛船","載人航天","航天員","神舟","天宮","天舟","空間站","長征火箭"],
+    "聯合作戰":     ["聯合作戰","聯合演習","戰區","多軍種","協同作戰"],
+}
+
+# 優先分類：航天詞彙出現時直接歸為航天，不再誤判為其他軍種
+PRIORITY_KEYWORDS = {
+    "航天": ["飛船","載人航天","航天員","神舟","天宮","天舟","空間站","長征火箭"],
 }
 
 EQ_PATTERNS = [
@@ -277,6 +297,10 @@ TITLE_PATTERNS = [
 
 
 def classify(title):
+    # 優先判斷：航天詞彙直接歸類，避免被誤判為海軍或其他
+    for branch, kws in PRIORITY_KEYWORDS.items():
+        if any(k in title for k in kws):
+            return branch
     scores = {}
     for branch, kws in KEYWORDS.items():
         scores[branch] = sum(1 for k in kws if k in title)
