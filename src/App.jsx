@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 
 // ══ 設定區 ══════════════════════════════════════════════════
 // 把你的 Google Sheet ID 填在這裡
-// 格式：https://docs.google.com/spreadsheets/d/【這裡】/edit
 const SHEET_ID = "1foCA5umbkVhgx0YfRau56hpX5qe97MaANvcuRNmtYdg";
 
-// Google Sheets 公開 CSV 讀取 URL
-const SHEET_URL = (tab) =>
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+// 用 CSV 格式讀取，最穩定
+const SHEET_CSV_URL = (tab) =>
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(tab)}`;
 // ════════════════════════════════════════════════════════════
 
 const BRANCHES = [
@@ -24,25 +23,30 @@ function getBr(label) {
   return BRANCHES.find(b => b.id === label) || BRANCHES[BRANCHES.length - 1];
 }
 
-// 解析 Google Sheets gviz JSON 格式
-function parseSheetJson(raw) {
-  try {
-    const json = JSON.parse(raw.replace(/^[^(]+\(/, "").replace(/\);?\s*$/, ""));
-    const cols = json.table.cols.map(c => c.label);
-    const rows = (json.table.rows || []).map(r =>
-      Object.fromEntries(cols.map((col, i) => [col, r.c[i]?.v ?? ""]))
-    );
-    return rows;
-  } catch {
-    return [];
-  }
+// 解析 CSV
+function parseCsv(text) {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
+  return lines.slice(1).map(line => {
+    // 處理欄位內有逗號的情況
+    const cols = [];
+    let cur = "", inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === "," && !inQ) { cols.push(cur.trim()); cur = ""; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return Object.fromEntries(headers.map((h, i) => [h, (cols[i] || "").replace(/^"|"$/g, "")]));
+  });
 }
 
 async function fetchSheet(tabName) {
   try {
-    const res = await fetch(SHEET_URL(tabName));
+    const res = await fetch(SHEET_CSV_URL(tabName));
     const text = await res.text();
-    return parseSheetJson(text);
+    return parseCsv(text);
   } catch {
     return [];
   }
