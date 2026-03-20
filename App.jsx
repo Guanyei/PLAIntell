@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 // ══ 設定區 ══════════════════════════════════════════════════
 // 把你的 Google Sheet ID 填在這裡
 // 格式：https://docs.google.com/spreadsheets/d/【這裡】/edit
-const SHEET_ID = "YOUR_GOOGLE_SHEET_ID";
+const SHEET_ID = "1foCA5umbkVhgx0YfRau56hpX5qe97MaANvcuRNmtYdg";
 
 // Google Sheets 公開 CSV 讀取 URL
 const SHEET_URL = (tab) =>
