@@ -1,6 +1,6 @@
 """
 PLA Intel Scraper
-自動抓取解放軍相關新聞，分類後寫入 Google Sheets
+自動抓取解放軍相關新聞與 YouTube 字幕，分類後寫入 Google Sheets
 """
 
 import os
@@ -8,18 +8,35 @@ import re
 import json
 import time
 import datetime
+import subprocess
 import requests
 from bs4 import BeautifulSoup
 import gspread
 from google.oauth2.service_account import Credentials
 
 # ── 設定 ────────────────────────────────────────────────────
-SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")  # 從 GitHub Secrets 取得
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")  # 選填，用於 AI 分類
+SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
+]
+
+# ── YouTube 頻道（只抓字幕，不下載影片）───────────────────
+YOUTUBE_CHANNELS = [
+    {
+        "id": "cctv7_yt",
+        "name": "CCTV-7 國防軍事",
+        "channel_id": "UCW-oZ_79yRYG9vnwx3Pks0Q",
+        "max_videos": 10,
+    },
+    {
+        "id": "cctv_news_yt",
+        "name": "央視新聞",
+        "channel_id": "UCSs4Dk4NjMpHJLSxD6RAFNQ",
+        "max_videos": 10,
+    },
 ]
 
 # ── 新聞來源 ─────────────────────────────────────────────────
@@ -59,130 +76,153 @@ SOURCES = [
         "article_selector": "a",
         "title_pattern": r"[\u4e00-\u9fff]{8,}",
     },
-    # ── 央視各頻道 ──────────────────────────────────────────
+    # ── CCTV-7 國防軍事頻道全部節目 ──────────────────────────
+    {
+        "id": "cctv7_jsbd",
+        "name": "CCTV-7 軍事報道",
+        "url": "https://tv.cctv.com/lm/jsbd/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_gfjszb",
+        "name": "CCTV-7 國防軍事早報",
+        "url": "https://tv.cctv.com/lm/gfjszb/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_fwxgc",
+        "name": "CCTV-7 防務新觀察",
+        "url": "https://tv.cctv.com/lm/fwxgc/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_jskj",
+        "name": "CCTV-7 軍事科技",
+        "url": "https://tv.cctv.com/lm/jskj/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_jwt",
+        "name": "CCTV-7 講武堂",
+        "url": "https://tv.cctv.com/lm/jwt/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_bqmmg",
+        "name": "CCTV-7 兵器面面觀",
+        "url": "https://tv.cctv.com/lm/bqmmg/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_lijian",
+        "name": "CCTV-7 砺劍",
+        "url": "https://tv.cctv.com/lm/lijian/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_jmxtx",
+        "name": "CCTV-7 軍迷行天下",
+        "url": "https://tv.cctv.com/lm/jmxtx/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_jqsjd",
+        "name": "CCTV-7 軍情時間到",
+        "url": "https://tv.cctv.com/lm/jqsjd/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv7_jsfj",
+        "name": "CCTV-7 國防軍事",
+        "url": "https://tv.cctv.com/lm/jsfj/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    # ── CCTV-13 新聞頻道所有節目 ─────────────────────────────
+    {
+        "id": "cctv13_xw30",
+        "name": "CCTV-13 新聞30分",
+        "url": "https://tv.cctv.com/lm/xw30f/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_jdft",
+        "name": "CCTV-13 焦點訪談",
+        "url": "https://tv.cctv.com/lm/jdft/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_gdft",
+        "name": "CCTV-13 高端訪談",
+        "url": "https://tv.cctv.com/lm/gdft/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_xwzk",
+        "name": "CCTV-13 新聞週刊",
+        "url": "https://tv.cctv.com/lm/xwzk/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_xwdc",
+        "name": "CCTV-13 新聞調查",
+        "url": "https://tv.cctv.com/lm/xwdc/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_jqsjd",
+        "name": "CCTV-13 軍情時間到",
+        "url": "https://tv.cctv.com/lm/jqsjd/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_hqsx",
+        "name": "CCTV-13 環球視線",
+        "url": "https://tv.cctv.com/lm/hqsx/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_gjsx",
+        "name": "CCTV-13 國際時訊",
+        "url": "https://tv.cctv.com/lm/gjsx/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_mdm",
+        "name": "CCTV-13 面對面",
+        "url": "https://tv.cctv.com/lm/mdm/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    {
+        "id": "cctv13_mzzlbg",
+        "name": "CCTV-13 每週質量報告",
+        "url": "https://tv.cctv.com/lm/mzzlbg/index.shtml",
+        "article_selector": "a[href*='/20']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}",
+    },
+    # ── 央視軍事網站 ──────────────────────────────────────────
     {
         "id": "cctv_mil",
         "name": "央視軍事",
         "url": "https://military.cctv.com/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv1",
-        "name": "CCTV-1 綜合",
-        "url": "https://tv.cctv.com/cctv1/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv2",
-        "name": "CCTV-2 財經",
-        "url": "https://tv.cctv.com/cctv2/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv3",
-        "name": "CCTV-3 綜藝",
-        "url": "https://tv.cctv.com/cctv3/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv4",
-        "name": "CCTV-4 中文國際",
-        "url": "https://tv.cctv.com/cctv4/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv5",
-        "name": "CCTV-5 體育",
-        "url": "https://tv.cctv.com/cctv5/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv6",
-        "name": "CCTV-6 電影",
-        "url": "https://tv.cctv.com/cctv6/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv7",
-        "name": "CCTV-7 國防軍事",
-        "url": "https://tv.cctv.com/cctv7/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv8",
-        "name": "CCTV-8 電視劇",
-        "url": "https://tv.cctv.com/cctv8/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv9",
-        "name": "CCTV-9 紀錄",
-        "url": "https://tv.cctv.com/cctv9/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv10",
-        "name": "CCTV-10 科教",
-        "url": "https://tv.cctv.com/cctv10/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv11",
-        "name": "CCTV-11 戲曲",
-        "url": "https://tv.cctv.com/cctv11/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv12",
-        "name": "CCTV-12 社會與法",
-        "url": "https://tv.cctv.com/cctv12/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv13",
-        "name": "CCTV-13 新聞",
-        "url": "https://tv.cctv.com/cctv13/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv14",
-        "name": "CCTV-14 少兒",
-        "url": "https://tv.cctv.com/cctv14/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv15",
-        "name": "CCTV-15 音樂",
-        "url": "https://tv.cctv.com/cctv15/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv16",
-        "name": "CCTV-16 奧林匹克",
-        "url": "https://tv.cctv.com/cctv16/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
-    },
-    {
-        "id": "cctv17",
-        "name": "CCTV-17 農業農村",
-        "url": "https://tv.cctv.com/cctv17/",
         "article_selector": "a",
         "title_pattern": r"[\u4e00-\u9fff]{8,}",
     },
@@ -258,108 +298,241 @@ def extract_equipment(title, branch):
         for m in re.finditer(pat, title):
             model = name_fn(m)
             t = eq_type or (m.group(2) if m.lastindex and m.lastindex >= 2 else "裝備")
-            if model and not any(r["model"] == model for r in results):
+            # 只寫有具體型號的裝備（含數字或是特定具名裝備）
+            has_number = bool(re.search(r'\d', model))
+            is_named = model in ["航母", "北斗"]
+            if model and (has_number or is_named) and not any(r["model"] == model for r in results):
                 results.append({"model": model, "type": t, "unit": find_unit(title), "branch": branch})
     return results
 
+
+NAME_PATTERN = r'[\u4e00-\u9fff]{2,4}(?=(?:司令|政委|參謀長|旅長|艦長|飛行員|士兵|指揮員|維和))'
+
+def extract_name(title, title_name):
+    """從職稱前面嘗試抽取姓名（2-4個中文字）"""
+    pat = rf'([\u4e00-\u9fff]{{2,4}}){re.escape(title_name)}'
+    m = re.search(pat, title)
+    return m.group(1) if m else ""
 
 def extract_personnel(title, branch):
     results = []
     for pat, title_name in TITLE_PATTERNS:
         if re.search(pat, title) and not any(r["title"] == title_name for r in results):
-            results.append({"unit": find_unit(title), "title": title_name, "name": "", "branch": branch})
-    if not results:
-        unit = find_unit(title)
-        if unit:
-            results.append({"unit": unit, "title": "—", "name": "", "branch": branch})
+            unit = find_unit(title)
+            name = extract_name(title, title_name)
+            # 只有找到姓名才寫入人資
+            if name:
+                results.append({"unit": unit, "title": title_name, "name": name, "branch": branch})
     return results
+
+
+def fetch_video_detail(url, headers):
+    """進入影片頁面抓取簡介文字"""
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.encoding = resp.apparent_encoding
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # 央視影片頁的簡介選擇器
+        for sel in [".video_intro", ".description", ".info_brief", "p.brief", ".episode-info p"]:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(strip=True)
+                if len(text) > 10:
+                    return text
+        # fallback：抓所有 <p> 裡最長的一段
+        paras = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 20]
+        return max(paras, key=len) if paras else ""
+    except Exception:
+        return ""
 
 
 def fetch_articles(source):
     """抓取單一來源的新聞列表"""
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "zh-TW,zh;q=0.9",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Referer": "https://www.baidu.com/",
     }
     articles = []
+    is_cctv_video = "tv.cctv.com/lm" in source["url"]
     try:
         resp = requests.get(source["url"], headers=headers, timeout=15)
         resp.encoding = resp.apparent_encoding
         soup = BeautifulSoup(resp.text, "html.parser")
+
         links = soup.select(source["article_selector"])
+        if not links:
+            links = soup.find_all("a")
+
         seen = set()
-        for link in links[:30]:
+        for link in links[:20]:
             title = link.get_text(strip=True)
             if not re.search(source["title_pattern"], title):
                 continue
-            if len(title) < 8 or title in seen:
+            if len(title) < 6 or len(title) > 80 or title in seen:
                 continue
             seen.add(title)
+
             href = link.get("href", "")
             if href and not href.startswith("http"):
                 base = "/".join(source["url"].split("/")[:3])
                 href = base + "/" + href.lstrip("/")
-            branch = classify(title)
-            article = {
+
+            # 央視影片頁：進去抓簡介
+            detail = ""
+            if is_cctv_video and href and "tv.cctv.com/20" in href:
+                detail = fetch_video_detail(href, headers)
+                time.sleep(0.5)
+
+            full_text = title + detail
+            branch = classify(full_text)
+
+            articles.append({
                 "title": title,
                 "url": href or source["url"],
                 "source": source["name"],
                 "branch": branch,
                 "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            }
-            articles.append(article)
+                "detail": detail[:200] if detail else "",
+            })
+        print(f"    → 抓到 {len(articles)} 則")
     except Exception as e:
         print(f"  ⚠ 抓取 {source['name']} 失敗：{e}")
     return articles
 
 
 def write_to_sheets(gc, sheet_id, articles):
-    """寫入 Google Sheets，分三個工作表"""
+    """寫入 Google Sheets，分三個工作表（每次清空重寫，避免重複）"""
     wb = gc.open_by_key(sheet_id)
-
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # ── 新聞列表 ──
     try:
         ws_news = wb.worksheet("新聞列表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_news = wb.add_worksheet("新聞列表", rows=1000, cols=6)
-        ws_news.append_row(["標題", "來源", "軍種", "時間", "連結", "更新時間"])
-
-    news_rows = [[a["title"], a["source"], a["branch"], a["time"], a["url"], now] for a in articles]
+        ws_news = wb.add_worksheet("新聞列表", rows=2000, cols=6)
+    ws_news.clear()
+    ws_news.append_row(["標題", "簡介", "來源", "軍種", "時間", "連結", "更新時間"])
+    news_rows = [[a["title"], a.get("detail",""), a["source"], a["branch"], a["time"], a["url"], now] for a in articles]
     if news_rows:
         ws_news.append_rows(news_rows, value_input_option="RAW")
 
-    # ── 人資資料表 ──
+    # ── 人資資料表（只寫有明確職稱的資料）──
     try:
         ws_per = wb.worksheet("人資資料表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_per = wb.add_worksheet("人資資料表", rows=1000, cols=7)
-        ws_per.append_row(["部隊單位", "職稱/職務", "姓名", "軍種", "備註", "新聞標題", "來源"])
-
+        ws_per = wb.add_worksheet("人資資料表", rows=2000, cols=6)
+    ws_per.clear()
+    ws_per.append_row(["姓名", "職稱/職務", "部隊單位", "軍種", "新聞標題", "來源", "時間"])
     per_rows = []
     for a in articles:
         for p in extract_personnel(a["title"], a["branch"]):
-            per_rows.append([p["unit"], p["title"], p["name"], p["branch"], a["title"][:30], a["title"], a["source"]])
+            if p["name"]:  # 有姓名才寫入
+                per_rows.append([p["name"], p["title"], p["unit"], p["branch"], a["title"], a["source"], a["time"]])
     if per_rows:
         ws_per.append_rows(per_rows, value_input_option="RAW")
 
-    # ── 裝備資料表 ──
+    # ── 裝備資料表（只寫有明確型號的資料）──
     try:
         ws_eq = wb.worksheet("裝備資料表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_eq = wb.add_worksheet("裝備資料表", rows=1000, cols=7)
-        ws_eq.append_row(["武器/裝備型號", "類型", "使用單位", "軍種", "備註", "新聞標題", "來源"])
-
+        ws_eq = wb.add_worksheet("裝備資料表", rows=2000, cols=6)
+    ws_eq.clear()
+    ws_eq.append_row(["武器/裝備型號", "類型", "使用單位", "軍種", "新聞標題", "來源"])
     eq_rows = []
     for a in articles:
         for e in extract_equipment(a["title"], a["branch"]):
-            eq_rows.append([e["model"], e["type"], e["unit"], e["branch"], "", a["title"], a["source"]])
+            # 只有型號不為空才寫入
+            if e["model"] and e["model"].strip():
+                eq_rows.append([e["model"], e["type"], e["unit"], e["branch"], a["title"], a["source"]])
     if eq_rows:
         ws_eq.append_rows(eq_rows, value_input_option="RAW")
 
     print(f"✓ 寫入 {len(news_rows)} 則新聞、{len(per_rows)} 筆人資、{len(eq_rows)} 筆裝備")
+
+
+def fetch_youtube_subtitles(channel):
+    """用 yt-dlp 抓取 YouTube 頻道最新影片的字幕（不下載影片）"""
+    articles = []
+    try:
+        channel_url = f"https://www.youtube.com/channel/{channel['channel_id']}/videos"
+        # 只抓字幕和元數據，不下載影片
+        cmd = [
+            "yt-dlp",
+            "--flat-playlist",
+            "--playlist-end", str(channel["max_videos"]),
+            "--print", "%(id)s\t%(title)s\t%(upload_date)s",
+            channel_url,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            print(f"  ⚠ {channel['name']} playlist 失敗：{result.stderr[:200]}")
+            return articles
+
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) < 2:
+                continue
+            video_id, title = parts[0], parts[1]
+            date_str = parts[2] if len(parts) > 2 else ""
+
+            # 格式化日期
+            try:
+                dt = datetime.datetime.strptime(date_str, "%Y%m%d")
+                time_str = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            # 嘗試抓自動字幕
+            subtitle_text = ""
+            sub_cmd = [
+                "yt-dlp",
+                "--skip-download",
+                "--write-auto-subs",
+                "--sub-lang", "zh-Hans",
+                "--sub-format", "vtt",
+                "-o", f"/tmp/sub_{video_id}",
+                f"https://www.youtube.com/watch?v={video_id}",
+            ]
+            sub_result = subprocess.run(sub_cmd, capture_output=True, text=True, timeout=30)
+            sub_file = f"/tmp/sub_{video_id}.zh-Hans.vtt"
+            if os.path.exists(sub_file):
+                with open(sub_file, "r", encoding="utf-8") as f:
+                    raw = f.read()
+                # 去掉 VTT 標記，只留純文字
+                lines = [l.strip() for l in raw.split("\n")
+                         if l.strip() and not l.startswith("WEBVTT")
+                         and not re.match(r'^\d+:\d+', l)
+                         and not re.match(r'^<', l)
+                         and "-->" not in l]
+                subtitle_text = "".join(dict.fromkeys(lines))  # 去重
+                os.remove(sub_file)
+
+            # 用標題+字幕內容分類
+            full_text = title + subtitle_text
+            branch = classify(full_text)
+
+            # 只保留跟軍事有關的（非綜合/其他）
+            if branch == "綜合/其他" and not any(k in full_text for k in ["军事","國防","解放軍","部队","武器","导弹"]):
+                continue
+
+            articles.append({
+                "title": title,
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+                "source": channel["name"],
+                "branch": branch,
+                "time": time_str,
+                "content": subtitle_text[:500] if subtitle_text else "",  # 字幕前500字
+            })
+            print(f"    ✓ {title[:30]}... [{branch}]")
+            time.sleep(1)
+
+    except Exception as e:
+        print(f"  ⚠ {channel['name']} YouTube 抓取失敗：{e}")
+    return articles
 
 
 def main():
@@ -378,16 +551,24 @@ def main():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     gc = gspread.authorize(creds)
 
-    # 抓取各來源
+    # 抓取各網頁來源
     all_articles = []
     for src in SOURCES:
         print(f"  抓取 {src['name']}...")
         arts = fetch_articles(src)
-        print(f"    → {len(arts)} 則")
         all_articles.extend(arts)
-        time.sleep(2)  # 避免太快
+        time.sleep(2)
 
-    print(f"\n共抓到 {len(all_articles)} 則新聞")
+    # 抓取 YouTube 字幕
+    print("\n── YouTube 字幕抓取 ──")
+    for ch in YOUTUBE_CHANNELS:
+        print(f"  抓取 {ch['name']}...")
+        yt_arts = fetch_youtube_subtitles(ch)
+        print(f"    → {len(yt_arts)} 則軍事相關")
+        all_articles.extend(yt_arts)
+        time.sleep(3)
+
+    print(f"\n共抓到 {len(all_articles)} 則")
 
     if all_articles:
         write_to_sheets(gc, SHEET_ID, all_articles)
