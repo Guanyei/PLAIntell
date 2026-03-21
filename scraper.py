@@ -340,54 +340,67 @@ def fetch_articles(source):
     return articles
 
 
-def write_to_sheets(gc, sheet_id, articles):
-    """寫入 Google Sheets，分三個工作表（每次清空重寫，避免重複）"""
-    wb = gc.open_by_key(sheet_id)
+def get_seen_titles(wb):
+    """從 Google Sheets 取得已存在的新聞標題，避免重複分析"""
+    try:
+        ws = wb.worksheet("新聞列表")
+        titles = ws.col_values(1)[1:]  # 跳過標題列
+        return set(titles)
+    except Exception:
+        return set()
+
+
+def write_to_sheets(gc, sheet_id, articles, wb=None):
+    """寫入 Google Sheets — 只新增，不清空舊資料"""
+    if wb is None:
+        wb = gc.open_by_key(sheet_id)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # ── 新聞列表 ──
+    # ── 新聞列表（追加）──
     try:
         ws_news = wb.worksheet("新聞列表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_news = wb.add_worksheet("新聞列表", rows=2000, cols=6)
-    ws_news.clear()
-    ws_news.append_row(["標題", "簡介", "來源", "軍種", "時間", "連結", "更新時間"])
+        ws_news = wb.add_worksheet("新聞列表", rows=5000, cols=7)
+        ws_news.append_row(["標題", "簡介", "來源", "軍種", "時間", "連結", "更新時間"])
     news_rows = [[a["title"], a.get("detail",""), a["source"], a["branch"], a["time"], a["url"], now] for a in articles]
     if news_rows:
         ws_news.append_rows(news_rows, value_input_option="RAW")
 
-    # ── 人資資料表（只寫有明確職稱的資料）──
+    # ── 人資資料表（追加）──
     try:
         ws_per = wb.worksheet("人資資料表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_per = wb.add_worksheet("人資資料表", rows=2000, cols=6)
-    ws_per.clear()
-    ws_per.append_row(["姓名", "職稱/職務", "部隊單位", "軍種", "新聞標題", "來源", "時間"])
+        ws_per = wb.add_worksheet("人資資料表", rows=5000, cols=7)
+        ws_per.append_row(["姓名", "職稱/職務", "部隊單位", "軍種", "新聞標題", "來源", "時間"])
     per_rows = []
     for a in articles:
-        for p in extract_personnel(a["title"], a["branch"]):
-            if p["name"]:  # 有姓名才寫入
-                per_rows.append([p["name"], p["title"], p["unit"], p["branch"], a["title"], a["source"], a["time"]])
+        personnel = a.get("_personnel") or []
+        if not personnel:
+            personnel = [p for p in extract_personnel(a["title"], a["branch"]) if p.get("name")]
+        for p in personnel:
+            if p.get("name") or p.get("title"):
+                per_rows.append([p.get("name",""), p.get("title",""), p.get("unit",""), a["branch"], a["title"], a["source"], a["time"]])
     if per_rows:
         ws_per.append_rows(per_rows, value_input_option="RAW")
 
-    # ── 裝備資料表（只寫有明確型號的資料）──
+    # ── 裝備資料表（追加）──
     try:
         ws_eq = wb.worksheet("裝備資料表")
     except gspread.exceptions.WorksheetNotFound:
-        ws_eq = wb.add_worksheet("裝備資料表", rows=2000, cols=6)
-    ws_eq.clear()
-    ws_eq.append_row(["武器/裝備型號", "類型", "使用單位", "軍種", "新聞標題", "來源"])
+        ws_eq = wb.add_worksheet("裝備資料表", rows=5000, cols=7)
+        ws_eq.append_row(["武器/裝備型號", "類型", "使用單位", "軍種", "備註", "新聞標題", "來源"])
     eq_rows = []
     for a in articles:
-        for e in extract_equipment(a["title"], a["branch"]):
-            # 只有型號不為空才寫入
-            if e["model"] and e["model"].strip():
-                eq_rows.append([e["model"], e["type"], e["unit"], e["branch"], a["title"], a["source"]])
+        equipment = a.get("_equipment") or []
+        if not equipment:
+            equipment = [e for e in extract_equipment(a["title"], a["branch"]) if e.get("model")]
+        for e in equipment:
+            if e.get("model"):
+                eq_rows.append([e.get("model",""), e.get("type",""), e.get("unit",""), a["branch"], e.get("note",""), a["title"], a["source"]])
     if eq_rows:
         ws_eq.append_rows(eq_rows, value_input_option="RAW")
 
-    print(f"✓ 寫入 {len(news_rows)} 則新聞、{len(per_rows)} 筆人資、{len(eq_rows)} 筆裝備")
+    print(f"✓ 新增 {len(news_rows)} 則新聞、{len(per_rows)} 筆人資、{len(eq_rows)} 筆裝備")
 
 
 def fetch_youtube_subtitles(channel):
@@ -473,6 +486,53 @@ def fetch_youtube_subtitles(channel):
     return articles
 
 
+def gemini_analyze(article):
+    """用 Gemini 分析單篇新聞，抽取人資與裝備資料"""
+    if not GEMINI_KEY:
+        return None
+    try:
+        text = article["title"]
+        if article.get("detail"):
+            text += "。" + article["detail"]
+
+        prompt = f"""分析以下解放軍軍事新聞，只回傳純JSON，不要任何說明文字。
+
+新聞：「{text}」
+
+JSON格式：
+{{
+  "branch": "軍種（陸軍/海軍/空軍/火箭軍/戰略支援部隊/航天/聯合作戰/綜合其他）",
+  "personnel": [
+    {{"name": "姓名（無則空字串）", "title": "職稱", "unit": "部隊單位", "note": "備註"}}
+  ],
+  "equipment": [
+    {{"model": "具體型號（無具體型號則跳過）", "type": "類型", "unit": "使用單位", "note": "備註"}}
+  ]
+}}
+
+注意：
+- personnel 只填有明確姓名或職稱的人員，沒有就回傳空陣列
+- equipment 只填有具體型號的裝備（如殲-20、99A式坦克、东风-41），沒有就回傳空陣列
+- 不要填寫推測或模糊的資料"""
+
+        resp = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500},
+            },
+            timeout=20,
+        )
+        data = resp.json()
+        if "error" in data:
+            return None
+        raw = data["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(raw.replace("```json", "").replace("```", "").strip())
+    except Exception as e:
+        print(f"    Gemini 分析失敗：{e}")
+        return None
+
+
 def main():
     print(f"=== PLA Intel Scraper 啟動 {datetime.datetime.now()} ===")
 
@@ -488,6 +548,11 @@ def main():
     creds_dict = json.loads(creds_json)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     gc = gspread.authorize(creds)
+
+    # 取得已存在的標題，避免重複分析
+    wb = gc.open_by_key(SHEET_ID)
+    seen_titles = get_seen_titles(wb)
+    print(f"已有 {len(seen_titles)} 則舊新聞")
 
     # 抓取各網頁來源
     all_articles = []
@@ -506,13 +571,25 @@ def main():
         all_articles.extend(yt_arts)
         time.sleep(3)
 
-    print(f"\n共抓到 {len(all_articles)} 則")
+    # 只保留新增的新聞
+    new_articles = [a for a in all_articles if a["title"] not in seen_titles]
+    print(f"\n共抓到 {len(all_articles)} 則，其中新增 {len(new_articles)} 則")
 
-    if all_articles:
-        write_to_sheets(gc, SHEET_ID, all_articles)
+    if not new_articles:
+        print("沒有新內容，結束執行")
+        return
 
-    print("=== 完成 ===")
-
-
-if __name__ == "__main__":
-    main()
+    # Gemini 批次分析（只分析新增的）
+    if GEMINI_KEY:
+        print(f"\n── Gemini 分析 {len(new_articles)} 則新內容 ──")
+        for i, a in enumerate(new_articles):
+            result = gemini_analyze(a)
+            if result:
+                if result.get("branch"):
+                    a["branch"] = result["branch"]
+                a["_personnel"] = result.get("personnel", [])
+                a["_equipment"] = result.get("equipment", [])
+            else:
+                a["_personnel"] = []
+                a["_equipment"] = []
+            if (i + 1) % 10 ==
