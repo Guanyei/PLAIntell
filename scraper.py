@@ -84,155 +84,69 @@ SOURCES = [
         "article_selector": "a",
         "title_pattern": r"[\u4e00-\u9fff]{6,}",
     },
-    # ── CCTV-7 國防軍事頻道全部節目 ──────────────────────────
+    # ── 中國軍視網（tv.81.cn）— 有實際內容，靜態 HTML ────────
     {
-        "id": "cctv7_jsbd",
-        "name": "CCTV-7 軍事報道",
-        "url": "https://tv.cctv.com/lm/jsbd/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_jsbd",
+        "name": "軍事報道",
+        "url": "http://tv.81.cn/zgjs/jsbd/index.html",
+        "article_selector": "a[href*='.html']",
+        "title_pattern": r"[\u4e00-\u9fff]{4,}|军事报道",
+    },
+    {
+        "id": "81tv_jsjs",
+        "name": "軍事紀實",
+        "url": "http://tv.81.cn/zgjs/jsjs/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_gfjszb",
-        "name": "CCTV-7 國防軍事早報",
-        "url": "https://tv.cctv.com/lm/gfjszb/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_jwt",
+        "name": "講武堂",
+        "url": "http://tv.81.cn/zgjs/jwt/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_fwxgc",
-        "name": "CCTV-7 防務新觀察",
-        "url": "https://tv.cctv.com/lm/fwxgc/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_fwxgc",
+        "name": "防務新觀察",
+        "url": "http://tv.81.cn/zgjs/fwxgc/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_jskj",
-        "name": "CCTV-7 軍事科技",
-        "url": "https://tv.cctv.com/lm/jskj/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_jskj",
+        "name": "軍事科技",
+        "url": "http://tv.81.cn/zgjs/jskj/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_jwt",
-        "name": "CCTV-7 講武堂",
-        "url": "https://tv.cctv.com/lm/jwt/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_bzjd",
+        "name": "百戰經典",
+        "url": "http://tv.81.cn/zgjs/bzjd/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_bqmmg",
-        "name": "CCTV-7 兵器面面觀",
-        "url": "https://tv.cctv.com/lm/bqmmg/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_jmxtx",
+        "name": "軍迷行天下",
+        "url": "http://tv.81.cn/zgjs/jmxtx/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_lijian",
-        "name": "CCTV-7 砺劍",
-        "url": "https://tv.cctv.com/lm/lijian/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_ywbb",
+        "name": "要聞播報",
+        "url": "http://tv.81.cn/bydssy/ywbb/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
     },
     {
-        "id": "cctv7_jmxtx",
-        "name": "CCTV-7 軍迷行天下",
-        "url": "https://tv.cctv.com/lm/jmxtx/index.shtml",
-        "article_selector": "a[href*='/20']",
+        "id": "81tv_jszqy",
+        "name": "軍事最前沿",
+        "url": "http://tv.81.cn/jszqy/index.html",
+        "article_selector": "a[href*='.html']",
         "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv7_jqsjd",
-        "name": "CCTV-7 軍情時間到",
-        "url": "https://tv.cctv.com/lm/jqsjd/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv7_jsfj",
-        "name": "CCTV-7 國防軍事",
-        "url": "https://tv.cctv.com/lm/jsfj/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    # ── CCTV-13 新聞頻道所有節目 ─────────────────────────────
-    {
-        "id": "cctv13_xw30",
-        "name": "CCTV-13 新聞30分",
-        "url": "https://tv.cctv.com/lm/xw30f/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_jdft",
-        "name": "CCTV-13 焦點訪談",
-        "url": "https://tv.cctv.com/lm/jdft/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_gdft",
-        "name": "CCTV-13 高端訪談",
-        "url": "https://tv.cctv.com/lm/gdft/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_xwzk",
-        "name": "CCTV-13 新聞週刊",
-        "url": "https://tv.cctv.com/lm/xwzk/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_xwdc",
-        "name": "CCTV-13 新聞調查",
-        "url": "https://tv.cctv.com/lm/xwdc/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_jqsjd",
-        "name": "CCTV-13 軍情時間到",
-        "url": "https://tv.cctv.com/lm/jqsjd/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_hqsx",
-        "name": "CCTV-13 環球視線",
-        "url": "https://tv.cctv.com/lm/hqsx/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_gjsx",
-        "name": "CCTV-13 國際時訊",
-        "url": "https://tv.cctv.com/lm/gjsx/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_mdm",
-        "name": "CCTV-13 面對面",
-        "url": "https://tv.cctv.com/lm/mdm/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    {
-        "id": "cctv13_mzzlbg",
-        "name": "CCTV-13 每週質量報告",
-        "url": "https://tv.cctv.com/lm/mzzlbg/index.shtml",
-        "article_selector": "a[href*='/20']",
-        "title_pattern": r"[\u4e00-\u9fff]{4,}",
-    },
-    # ── 央視軍事網站 ──────────────────────────────────────────
-    {
-        "id": "cctv_mil",
-        "name": "央視軍事",
-        "url": "https://military.cctv.com/",
-        "article_selector": "a",
-        "title_pattern": r"[\u4e00-\u9fff]{8,}",
     },
 ]
 
@@ -379,7 +293,7 @@ def fetch_articles(source):
         "Referer": "https://www.baidu.com/",
     }
     articles = []
-    is_cctv_video = "tv.cctv.com/lm" in source["url"]
+    is_cctv_video = "tv.81.cn" in source["url"] or "tv.cctv.com/lm" in source["url"]
     try:
         resp = requests.get(source["url"], headers=headers, timeout=15)
         resp.encoding = resp.apparent_encoding
@@ -405,7 +319,7 @@ def fetch_articles(source):
 
             # 央視影片頁：進去抓簡介
             detail = ""
-            if is_cctv_video and href and "tv.cctv.com/20" in href:
+            if is_cctv_video and href and ("tv.81.cn" in href or "tv.cctv.com/20" in href):
                 detail = fetch_video_detail(href, headers)
                 time.sleep(0.5)
 
