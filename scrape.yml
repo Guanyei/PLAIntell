@@ -2,27 +2,30 @@ name: PLA Intel Scraper
 
 on:
   schedule:
-    - cron: '0 * * * *'   # 每小時整點執行
-  workflow_dispatch:        # 也可以手動觸發
+    - cron: '0 6 * * *'    # 瘥誩予 06:00 UTC+8=14:00 �� ��枏�滚�𦦵��𤌍+��𥪜�𨀣鰵��
+    - cron: '0 1 * * *'    # 瘥誩予 01:00 UTC嚗�09:00 �蝱��梹�争�� ��𤘪𡟺�𥼚+�𡟺��𤘪鰵��
+    - cron: '0 15 * * *'   # 瘥誩予 15:00 UTC嚗�23:00 �蝱��梹�争�� ��𤘪�𡁻�梶��𤌍
+    - cron: '0 2 * * 6'    # 瘥誯�勗�� 02:00 UTC嚗�10:00 �蝱��梹�争�� ��㯄�望錰蝭��𤌍
+  workflow_dispatch:        # ��见�閗孛�䔄
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout 程式碼
+      - name: Checkout 蝔见�讐Ⅳ
         uses: actions/checkout@v4
 
-      - name: 設定 Python
+      - name: 閮剖�� Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: 安裝依賴套件
+      - name: 摰㕑�苷�肽陷憟𦯀辣
         run: |
-          pip install requests beautifulsoup4 gspread google-auth
+          pip install requests beautifulsoup4 gspread google-auth yt-dlp
 
-      - name: 執行爬蟲
+      - name: �嘑銵𣬚��酑
         env:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
