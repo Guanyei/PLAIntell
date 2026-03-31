@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 // ══ 設定區 ══════════════════════════════════════════════════
 // 把你的 Google Sheet ID 填在這裡
-const SHEET_ID = "1foCA5umbkVhgx0YfRau56hpX5qe97MaANvcuRNmtYdg";
+const SHEET_ID = "YOUR_GOOGLE_SHEET_ID";
 
 // 用 CSV 格式讀取，最穩定
 const SHEET_CSV_URL = (tab) =>
@@ -15,6 +15,7 @@ const BRANCHES = [
   { id: "空軍",         bg: "#0a1525", accent: "#6a9ae4", icon: "✈" },
   { id: "火箭軍",       bg: "#2a0e0a", accent: "#e46a4a", icon: "🚀" },
   { id: "戰略支援部隊", bg: "#1a0a2a", accent: "#a46ad4", icon: "🛰" },
+  { id: "航天",         bg: "#0a1a2a", accent: "#4ad4d4", icon: "🚀🛸" },
   { id: "聯合作戰",     bg: "#1e1a08", accent: "#d4b44a", icon: "⚔" },
   { id: "綜合/其他",    bg: "#141414", accent: "#9a9a9a", icon: "📋" },
 ];
@@ -23,23 +24,32 @@ function getBr(label) {
   return BRANCHES.find(b => b.id === label) || BRANCHES[BRANCHES.length - 1];
 }
 
-// 解析 CSV
+// 解析 CSV（處理欄位內有逗號、換行、引號的情況）
 function parseCsv(text) {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
-  return lines.slice(1).map(line => {
-    // 處理欄位內有逗號的情況
-    const cols = [];
-    let cur = "", inQ = false;
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === "," && !inQ) { cols.push(cur.trim()); cur = ""; }
-      else { cur += ch; }
+  const rows = [];
+  let row = [], cur = "", inQ = false;
+  // 正規化換行
+  const chars = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    if (c === '"') {
+      if (inQ && chars[i+1] === '"') { cur += '"'; i++; } // 跳脫的引號
+      else { inQ = !inQ; }
+    } else if (c === ',' && !inQ) {
+      row.push(cur.trim()); cur = "";
+    } else if (c === '\n' && !inQ) {
+      row.push(cur.trim()); rows.push(row); row = []; cur = "";
+    } else {
+      cur += c;
     }
-    cols.push(cur.trim());
-    return Object.fromEntries(headers.map((h, i) => [h, (cols[i] || "").replace(/^"|"$/g, "")]));
-  });
+  }
+  if (cur || row.length) { row.push(cur.trim()); rows.push(row); }
+
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.replace(/^"|"$/g, "").trim());
+  return rows.slice(1)
+    .filter(r => r.some(v => v))
+    .map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] || "").replace(/^"|"$/g, "")])));
 }
 
 async function fetchSheet(tabName) {
@@ -232,7 +242,7 @@ summary(50字內摘要), implication(30字內戰略意涵), tags(3個關鍵字�
                         <span style={{fontSize:10,color:"#3a6a9a"}}>{art["來源"]}</span>
                         <span style={{fontSize:10,color:"#2a4a6a",marginLeft:"auto"}}>{art["時間"]}</span>
                       </div>
-                      <div style={{fontSize:13,lineHeight:1.5,marginBottom:art._summary?5:0}}>
+                      <div style={{fontSize:13,lineHeight:1.5,marginBottom:art["簡介"]||art._summary?5:0}}>
                         <a href={art["連結"]} target="_blank" rel="noopener noreferrer"
                           style={{color:"#d4e8f8",textDecoration:"none",borderBottom:"1px solid rgba(100,180,255,0.18)"}}
                           onMouseEnter={e=>{e.currentTarget.style.color="#7ac8ff";}}
@@ -240,6 +250,11 @@ summary(50字內摘要), implication(30字內戰略意涵), tags(3個關鍵字�
                           {art["標題"]}
                         </a>
                       </div>
+                      {art["簡介"] && !art._summary && (
+                        <div style={{fontSize:11,color:"#5a8a9a",padding:"3px 8px",background:"rgba(10,25,40,0.5)",borderLeft:`2px solid ${br.accent}33`,lineHeight:1.5,marginBottom:3}}>
+                          {art["簡介"]}
+                        </div>
+                      )}
                       {art._summary && (
                         <div style={{fontSize:11,color:"#6a9ab4",padding:"4px 8px",background:"rgba(10,30,50,0.5)",borderLeft:`2px solid ${br.accent}44`,lineHeight:1.5}}>
                           {art._summary}
