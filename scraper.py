@@ -592,4 +592,19 @@ def main():
             else:
                 a["_personnel"] = []
                 a["_equipment"] = []
-            if (i + 1) % 10 ==
+            if (i + 1) % 10 == 0:
+                print(f"  已分析 {i+1}/{len(new_articles)} 則")
+            time.sleep(1.5)
+    else:
+        print("\n⚠ 未設定 GEMINI_API_KEY，跳過 AI 分析")
+        for a in new_articles:
+            a["_personnel"] = []
+            a["_equipment"] = []
+
+    write_to_sheets(gc, SHEET_ID, new_articles, wb)
+
+    print("=== 完成 ===")
+
+
+if __name__ == "__main__":
+    main()
