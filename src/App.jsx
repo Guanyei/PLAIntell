@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 // ══ 設定區 ══════════════════════════════════════════════════
 // 把你的 Google Sheet ID 填在這裡
-const SHEET_ID = "YOUR_GOOGLE_SHEET_ID";
+const SHEET_ID = "1foCA5umbkVhgx0YfRau56hpX5qe97MaANvcuRNmtYdg";
 
 // 用 CSV 格式讀取，最穩定
 const SHEET_CSV_URL = (tab) =>
