@@ -2,32 +2,41 @@ name: PLA Intel Scraper
 
 on:
   schedule:
-    - cron: '0 6 * * *'    # 瘥誩予 06:00 UTC+8=14:00 �� ��枏�滚�𦦵��𤌍+��𥪜�𨀣鰵��
-    - cron: '0 1 * * *'    # 瘥誩予 01:00 UTC嚗�09:00 �蝱��梹�争�� ��𤘪𡟺�𥼚+�𡟺��𤘪鰵��
-    - cron: '0 15 * * *'   # 瘥誩予 15:00 UTC嚗�23:00 �蝱��梹�争�� ��𤘪�𡁻�梶��𤌍
-    - cron: '0 2 * * 6'    # 瘥誯�勗�� 02:00 UTC嚗�10:00 �蝱��梹�争�� ��㯄�望錰蝭��𤌍
-  workflow_dispatch:        # ��见�閗孛�䔄
+    - cron: '0 1 * * *'    # 每日 09:00 (台北時間)
+    - cron: '0 6 * * *'    # 每日 14:00 (台北時間)
+    - cron: '0 15 * * *'   # 每日 23:00 (台北時間)
+    - cron: '0 2 * * 6'    # 每週六 10:00 (台北時間)
+  workflow_dispatch:        # 允許手動執行
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    # 設定權限，確保 Action 有權限讀取內容
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout 蝔见�讐Ⅳ
+      - name: Checkout 程式碼
         uses: actions/checkout@v4
 
-      - name: 閮剖�� Python
+      - name: 設定 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          # 使用快取功能，加快下次執行的速度
+          cache: 'pip'
 
-      - name: 摰㕑�苷�肽陷憟𦯀辣
+      - name: 安裝必要依賴與 FFmpeg
         run: |
+          # yt-dlp 需要 ffmpeg 來處理某些影音格式或字幕提取
+          sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install requests beautifulsoup4 gspread google-auth yt-dlp
 
-      - name: �嘑銵𣬚��酑
+      - name: 執行爬蟲腳本
         env:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PYTHONIOENCODING: utf-8
+        # 使用 stdbuf 確保 Log 能即時顯示，方便在手機上監看進度
         run: python scraper.py
