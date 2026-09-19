@@ -6,7 +6,10 @@ const SHEET_ID = "1foCA5umbkVhgx0YfRau56hpX5qe97MaANvcuRNmtYdg";
 
 // 加上 t= 時間參數，防止 Google 回傳舊的快取資料，確保網頁即時更新[span_1](start_span)[span_1](end_span)[span_2](start_span)[span_2](end_span)
 const SHEET_URL = (tab) =>
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}&t=${new Date().getTime()}`;
+
+// 加入 &headers=1 強制將第 1 列視為欄位標題
+const SHEET_URL = (tab) =>
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(tab)}&t=${new Date().getTime()}`;
 // ════════════════════════════════════════════════════════════
 
 const BRANCHES = [
